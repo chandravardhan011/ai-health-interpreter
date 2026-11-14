@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Activity, Droplets, ShieldAlert, Sparkles, CheckCircle, AlertTriangle, AlertOctagon, HelpCircle } from 'lucide-react';
+import { Heart, Activity, Droplets, ShieldAlert, Sparkles, CheckCircle, AlertTriangle, AlertOctagon, Bookmark, Check } from 'lucide-react';
 
 export function RiskOverview({
   patient,
@@ -7,6 +7,8 @@ export function RiskOverview({
   overallUrgency,
   clinicalSummary,
   risks,
+  onSaveReport,
+  isSaved,
   t
 }) {
   const urgencyConfig = {
@@ -50,7 +52,6 @@ export function RiskOverview({
   const currentUrgency = urgencyConfig[overallUrgency] || urgencyConfig.moderate;
   const UrgencyIcon = currentUrgency.icon;
 
-  // Domain configurations
   const domainCards = [
     {
       id: 'cardio',
@@ -97,72 +98,100 @@ export function RiskOverview({
   return (
     <div className="space-y-6 mb-8">
       
-      {/* Top Banner: Patient Info & Overall Urgency */}
-      <div className="bg-gradient-to-r from-slate-900 via-clinical-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+      {/* Top Banner: Health Score & AI Clinical Synthesis */}
+      <div className="bg-gradient-to-r from-slate-900 via-clinical-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-clinical-500/10 rounded-full blur-3xl pointer-events-none" />
         
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           
-          {/* Patient Details */}
           <div>
             <div className="flex items-center space-x-2 text-xs font-semibold text-clinical-300 uppercase tracking-widest mb-1.5">
-              <span>Patient Profile</span>
+              <span>Health Score & AI Stratification</span>
               <span>•</span>
-              <span>Report Evaluated {patient.date || 'Today'}</span>
+              <span>ISO 15189 Aligned</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               {patient.name}
             </h2>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-xs sm:text-sm text-slate-300">
-              <span className="px-2.5 py-1 rounded-md bg-white/10 font-medium">Age: {patient.age}</span>
-              <span className="px-2.5 py-1 rounded-md bg-white/10 font-medium">Sex: {patient.gender}</span>
-              <span className="px-2.5 py-1 rounded-md bg-clinical-500/30 text-clinical-200 border border-clinical-400/30 font-medium">
-                Standard ISO 15189 Aligned
+              <span className="px-2.5 py-1 rounded-md bg-white/10 font-medium">{patient.age}</span>
+              <span className="px-2.5 py-1 rounded-md bg-white/10 font-medium">{patient.gender}</span>
+              <span className="px-2.5 py-1 rounded-md bg-clinical-500/30 text-clinical-200 border border-clinical-400/30 font-medium truncate max-w-xs">
+                {patient.testPanel}
               </span>
             </div>
           </div>
 
-          {/* Overall Health Score Ring & Urgency Badge */}
-          <div className="flex items-center space-x-5 bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/15 w-full md:w-auto justify-between md:justify-start">
-            <div className="relative flex items-center justify-center">
-              <svg className="w-20 h-20 transform -rotate-90">
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="32"
-                  stroke="currentColor"
-                  strokeWidth="6"
-                  className="text-white/20"
-                  fill="transparent"
-                />
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="32"
-                  stroke={currentUrgency.ringColor}
-                  strokeWidth="6"
-                  strokeDasharray={201}
-                  strokeDashoffset={201 - (201 * overallIndex) / 100}
-                  strokeLinecap="round"
-                  fill="transparent"
-                  className="transition-all duration-1000 ease-out"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-xl font-extrabold tracking-tight">{overallIndex}</span>
-                <span className="text-[9px] uppercase tracking-wider text-slate-300 font-semibold">/100</span>
+          {/* Right Action: Overall Score + Save Button */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
+            
+            <div className="flex items-center space-x-5 bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/15 w-full sm:w-auto justify-between sm:justify-start">
+              <div className="relative flex items-center justify-center">
+                <svg className="w-20 h-20 transform -rotate-90">
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="32"
+                    stroke="currentColor"
+                    strokeWidth="6"
+                    className="text-white/20"
+                    fill="transparent"
+                  />
+                  <circle
+                    cx="40"
+                    cy="40"
+                    r="32"
+                    stroke={currentUrgency.ringColor}
+                    strokeWidth="6"
+                    strokeDasharray={201}
+                    strokeDashoffset={201 - (201 * overallIndex) / 100}
+                    strokeLinecap="round"
+                    fill="transparent"
+                    className="transition-all duration-1000 ease-out"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <span className="text-xl font-extrabold tracking-tight">{overallIndex}</span>
+                  <span className="text-[9px] uppercase tracking-wider text-slate-300 font-semibold">/100</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  {t.overallScore}
+                </div>
+                <div className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold border ${currentUrgency.bgBadge}`}>
+                  <UrgencyIcon className="w-3.5 h-3.5" />
+                  <span>{currentUrgency.label}</span>
+                </div>
               </div>
             </div>
 
-            <div>
-              <div className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider mb-1">
-                {t.overallScore}
-              </div>
-              <div className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold border ${currentUrgency.bgBadge}`}>
-                <UrgencyIcon className="w-3.5 h-3.5" />
-                <span>{currentUrgency.label}</span>
-              </div>
-            </div>
+            {/* Save to History Button */}
+            {onSaveReport && (
+              <button
+                onClick={onSaveReport}
+                disabled={isSaved}
+                className={`no-print flex items-center justify-center space-x-1.5 px-4 py-3 rounded-2xl text-xs font-bold transition-all w-full sm:w-auto cursor-pointer ${
+                  isSaved
+                    ? 'bg-emerald-500 text-white shadow-md'
+                    : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
+                }`}
+              >
+                {isSaved ? (
+                  <>
+                    <Check className="w-4 h-4 text-white" />
+                    <span>{t.savedSuccess}</span>
+                  </>
+                ) : (
+                  <>
+                    <Bookmark className="w-4 h-4 text-slate-300" />
+                    <span>{t.saveThisReport}</span>
+                  </>
+                )}
+              </button>
+            )}
+
           </div>
 
         </div>

@@ -1,90 +1,113 @@
 import { BIOMARKER_DATABASE } from '../data/biomarkers.js';
 
 /**
- * Extracts patient details and biomarker results from raw medical report text.
+ * Extracts comprehensive patient metadata and biomarker results from medical report text.
  */
 export function parseMedicalReport(rawText) {
-  if (!rawText || typeof rawText !== 'string') {
+  if (!rawText || typeof rawText !== 'string' || !rawText.trim()) {
     return {
-      patient: { name: 'Patient', age: 'Unknown', gender: 'Unknown', date: new Date().toLocaleDateString() },
+      patient: null,
       biomarkers: [],
       rawText: ''
     };
   }
 
-  const lines = rawText.split(/\r?\n/);
+  const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
-  // Extract patient metadata if available
+  // Extract patient metadata with advanced regex & clinical heuristics
   const patient = {
-    name: 'Patient',
-    age: 'Unknown',
-    gender: 'Unknown',
-    date: new Date().toISOString().split('T')[0]
+    name: 'Patient Record',
+    age: 'Not specified',
+    gender: 'Not specified',
+    patientId: 'GEN-' + Math.floor(100000 + Math.random() * 900000),
+    labName: 'Clinical Diagnostic Facility',
+    reportDate: new Date().toISOString().split('T')[0],
+    testPanel: 'Diagnostic Biomarker Screening',
+    referringDoctor: 'Self / Primary Physician'
   };
 
-  const nameMatch = rawText.match(/(?:PATIENT(?: NAME)?|NAME)\s*[:=-]\s*([A-Za-z\s.]+?)(?=\s{2,}|AGE|GENDER|SEX|\n|$)/i);
-  if (nameMatch && nameMatch[1].trim()) {
-    patient.name = nameMatch[1].trim();
+  // 1. Extract Lab / Hospital / Clinic Name from first few header lines
+  for (let i = 0; i < Math.min(5, lines.length); i++) {
+    const line = lines[i];
+    if (/(?:LABORATORY|LAB|DIAGNOSTICS|CLINIC|HOSPITAL|PATHOLOGY|HEALTHCARE|MEDICAL CENTER|INSTITUTE|METROPOLIS|LAL PATH|APOLLO|THYROCARE)/i.test(line)) {
+      patient.labName = line.replace(/^[#*=-]+\s*/, '').replace(/\s*[#*=-]+$/, '').trim();
+      break;
+    }
   }
 
-  const ageMatch = rawText.match(/AGE\s*[:=-]\s*(\d{1,3})/i);
+  // 2. Extract Patient Name
+  const nameMatch = rawText.match(/(?:PATIENT(?:\s+NAME)?|NAME|PT\.?\s*NAME)\s*[:=-]\s*([A-Za-z\s.]+?)(?=\s{2,}|AGE|GENDER|SEX|DOB|ID|REF|DATE|\n|$)/i);
+  if (nameMatch && nameMatch[1].trim() && !/^(MALE|FEMALE|YEARS|YRS|AGE)$/i.test(nameMatch[1].trim())) {
+    patient.name = nameMatch[1].trim().replace(/^(MR\.?|MRS\.?|MS\.?|DR\.?)\s+/i, '');
+  }
+
+  // 3. Extract Age
+  const ageMatch = rawText.match(/(?:AGE|YRS|YEARS)\s*[:=-]?\s*(\d{1,3})(?:\s*(?:YRS|YEARS|Y|M))?/i);
   if (ageMatch) {
-    patient.age = parseInt(ageMatch[1], 10);
+    patient.age = parseInt(ageMatch[1], 10) + ' Years';
   }
 
+  // 4. Extract Gender / Sex
   const genderMatch = rawText.match(/(?:GENDER|SEX)\s*[:=-]\s*(MALE|FEMALE|M|F|OTHER)/i);
   if (genderMatch) {
     const g = genderMatch[1].toUpperCase();
     patient.gender = (g === 'M' || g === 'MALE') ? 'Male' : (g === 'F' || g === 'FEMALE') ? 'Female' : 'Other';
   }
 
-  const dateMatch = rawText.match(/(?:DATE|COLLECTION DATE|COLLECTED)\s*[:=-]\s*([A-Za-z0-9\s/-]+?)(?=\s{2,}|\n|$)/i);
+  // 5. Extract Patient ID / UHID / Ref No / MRN
+  const idMatch = rawText.match(/(?:PATIENT\s*ID|UHID|MRN|REF(?:ERENCE)?\s*(?:NO|ID)?|BILL\s*NO|SAMPLE\s*ID)\s*[:=-]\s*([A-Za-z0-9\-_/]+)/i);
+  if (idMatch && idMatch[1].trim()) {
+    patient.patientId = idMatch[1].trim();
+  }
+
+  // 6. Extract Collection / Report Date
+  const dateMatch = rawText.match(/(?:COLLECTION\s*DATE|COLLECTED|REPORT\s*DATE|DATE)\s*[:=-]\s*([A-Za-z0-9\s/-]+?)(?=\s{2,}|\n|TIME|$)/i);
   if (dateMatch && dateMatch[1].trim()) {
-    patient.date = dateMatch[1].trim();
+    patient.reportDate = dateMatch[1].trim();
+  }
+
+  // 7. Extract Referring Doctor / Physician
+  const docMatch = rawText.match(/(?:REF(?:ERRED)?\s*BY|DOCTOR|DR\.?|CONSULTANT)\s*[:=-]\s*([A-Za-z\s.]+?)(?=\s{2,}|\n|PATIENT|DATE|$)/i);
+  if (docMatch && docMatch[1].trim()) {
+    patient.referringDoctor = docMatch[1].trim();
+  }
+
+  // 8. Extract Test Panel Name / Investigation
+  const panelMatch = rawText.match(/(?:TEST\s*(?:PANEL|REPORT|DESCRIPTION)|INVESTIGATION|PANEL)\s*[:=-]\s*([A-Za-z0-9\s&/()-]+?)(?=\s{2,}|\n|DATE|PATIENT|$)/i);
+  if (panelMatch && panelMatch[1].trim()) {
+    patient.testPanel = panelMatch[1].trim();
   }
 
   // Detected Biomarkers Array
   const detectedBiomarkers = [];
   const handledKeySet = new Set();
-
-  // Biomarker database keys
   const dbEntries = Object.values(BIOMARKER_DATABASE);
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('---') || trimmed.startsWith('===')) continue;
 
-    // Check each biomarker definition
     for (const bio of dbEntries) {
       if (handledKeySet.has(bio.id)) continue;
 
-      // Check if any alias matches this line
       const matchedAlias = bio.aliases.find(alias => {
-        // Look for alias at word boundary
         const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const pattern = new RegExp(`\\b${escaped}\\b`, 'i');
         return pattern.test(trimmed);
       });
 
       if (matchedAlias) {
-        // Extract the numerical value from the line
-        // Pattern matches numbers like 14.8, 168, 6800, 0.85
-        // We look for numbers after the matched alias
         const aliasIndex = trimmed.toLowerCase().indexOf(matchedAlias.toLowerCase());
         const afterAlias = trimmed.slice(aliasIndex + matchedAlias.length);
 
-        // Find numbers in afterAlias (allow decimals and commas)
         const numMatches = [...afterAlias.matchAll(/(?:\b|(?<=\s))(\d+(?:[.,]\d+)?)(?:\b|(?=\s))/g)];
 
         if (numMatches.length > 0) {
-          // Usually the first valid number after test name is the observed value
           const rawNum = numMatches[0][1].replace(',', '.');
           const value = parseFloat(rawNum);
 
           if (!isNaN(value)) {
             handledKeySet.add(bio.id);
-
-            // Determine status
             const status = evaluateBiomarkerStatus(value, bio);
 
             detectedBiomarkers.push({
@@ -119,13 +142,9 @@ export function parseMedicalReport(rawText) {
   };
 }
 
-/**
- * Evaluates whether a biomarker is Low, Normal, High, or Critical.
- */
 function evaluateBiomarkerStatus(value, bio) {
   const [min, max] = bio.optimalRange;
 
-  // Check critical thresholds if available
   if (bio.criticalLow !== undefined && value <= bio.criticalLow) {
     return {
       status: 'CRITICAL_LOW',
