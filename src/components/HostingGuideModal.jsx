@@ -107,9 +107,9 @@ export function HostingGuideModal({ isOpen, onClose }) {
                   Run these commands in PowerShell or Command Prompt from the project directory:
                 </p>
                 <div className="bg-slate-900 text-slate-200 font-mono text-xs p-3.5 rounded-xl flex items-center justify-between">
-                  <code>npm i -g vercel && vercel</code>
+                  <code>npx vercel</code>
                   <button
-                    onClick={() => copyText('npm i -g vercel && vercel', 'cmd-vercel')}
+                    onClick={() => copyText('npx vercel', 'cmd-vercel')}
                     className="p-1 rounded text-slate-400 hover:text-white"
                   >
                     {copiedKey === 'cmd-vercel' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
