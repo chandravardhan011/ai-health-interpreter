@@ -1,0 +1,17 @@
+NATIONAL PATHOLOGY INSTITUTE
+PATIENT NAME: Priya Sharma    AGE: 29    SEX: FEMALE
+COLLECTED: 08-Nov-2026
+INVESTIGATION: COMPLETE HEMOGRAM (CBC) & IRON PANEL
+
+INVESTIGATION              VALUE      UNIT        NORMAL RANGE          INTERPRETATION
+Hemoglobin (Hb)            8.9        g/dL        12.0 - 15.5           CRITICAL LOW
+Red Blood Cell (RBC)       3.35       million/uL  3.8 - 5.2             LOW
+White Blood Cell (WBC)     6800       cells/uL    4000 - 11000          NORMAL
+Platelet Count             410        k/uL        150 - 450             NORMAL
+Mean Corpuscular Vol (MCV) 68.2       fL          80.0 - 100.0          LOW
+Serum Ferritin             6.2        ng/mL       15.0 - 150.0          CRITICAL LOW
+Vitamin B12                290        pg/mL       200 - 900             NORMAL
+Vitamin D (25-OH)          16.4       ng/mL       30 - 80               DEFICIENT
+Fasting Glucose            84         mg/dL       70 - 99               NORMAL
+Serum Creatinine           0.72       mg/dL       0.5 - 1.1             NORMAL
+Total Bilirubin            0.6        mg/dL       0.2 - 1.2             NORMAL

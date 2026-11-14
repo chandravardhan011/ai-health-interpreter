@@ -1,0 +1,18 @@
+APEX DIAGNOSTIC HEALTHCARE
+PATIENT: Elena Garcia     AGE: 47     GENDER: FEMALE
+TEST REPORT: DIABETES CARE & METABOLIC SCREENING
+DATE: 02-Nov-2026
+
+TEST DESCRIPTION           RESULT     UNIT        NORMAL INTERVAL       FLAG
+Hemoglobin A1c (HbA1c)     8.4        %           4.0 - 5.6             HIGH
+Fasting Blood Sugar        176        mg/dL       70 - 99               HIGH
+Total Cholesterol          215        mg/dL       120 - 200             HIGH
+Triglycerides              265        mg/dL       < 150                 HIGH
+HDL Cholesterol            38         mg/dL       45 - 65               LOW
+LDL Cholesterol            124        mg/dL       < 100                 BORDERLINE HIGH
+Serum Creatinine           1.15       mg/dL       0.55 - 1.02           BORDERLINE HIGH
+eGFR                       68         mL/min      > 90                  MILD DECREASE
+Blood Urea Nitrogen        22         mg/dL       7 - 20                SLIGHT HIGH
+Serum Uric Acid            6.8        mg/dL       2.4 - 6.0             HIGH
+Alkaline Phosphatase       95         U/L         44 - 147              NORMAL
+ALT (SGPT)                 52         U/L         7 - 35                HIGH
