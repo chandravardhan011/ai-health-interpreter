@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header.jsx';
 import { FileUpload } from './components/FileUpload.jsx';
 import { PatientDetailsCard } from './components/PatientDetailsCard.jsx';
+import { ExecutiveSummary } from './components/ExecutiveSummary.jsx';
 import { RiskOverview } from './components/RiskOverview.jsx';
 import { BiomarkerTable } from './components/BiomarkerTable.jsx';
 import { DoctorQuestions } from './components/DoctorQuestions.jsx';
@@ -10,7 +11,9 @@ import { AIAssistantChat } from './components/AIAssistantChat.jsx';
 import { AboutAndHowItWorks } from './components/AboutAndHowItWorks.jsx';
 import { MedicalDisclaimer } from './components/MedicalDisclaimer.jsx';
 import { SavedReportsDrawer } from './components/SavedReportsDrawer.jsx';
-import { HostingGuideModal } from './components/HostingGuideModal.jsx';
+import { AuthModal } from './components/AuthModal.jsx';
+import { ErrorBoundary } from './components/ErrorBoundary.jsx';
+import WelcomeBanner from './components/WelcomeBanner.jsx';
 
 import { TRANSLATIONS, SUPPORTED_LANGUAGES } from './data/translations.js';
 import { parseMedicalReport } from './utils/reportParser.js';
@@ -24,7 +27,14 @@ export function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [isSavedDrawerOpen, setIsSavedDrawerOpen] = useState(false);
-  const [isHostingGuideOpen, setIsHostingGuideOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('health_user') || 'null');
+    } catch {
+      return null;
+    }
+  });
   const [savedReports, setSavedReports] = useState([]);
   const [isCurrentSaved, setIsCurrentSaved] = useState(false);
   const [customPatient, setCustomPatient] = useState(null);
@@ -36,7 +46,11 @@ export function App() {
 
   // Load saved reports on mount
   useEffect(() => {
-    setSavedReports(getSavedReports());
+    async function loadReports() {
+      const reports = await getSavedReports();
+      setSavedReports(reports);
+    }
+    loadReports();
   }, []);
 
   // Parse report and calculate risks
@@ -67,7 +81,12 @@ export function App() {
     setTimeout(() => {
       setCurrentRawText(newText);
       setIsAnalyzing(false);
-      window.scrollTo({ top: 300, behavior: 'smooth' });
+      const parsed = parseMedicalReport(newText);
+      if (parsed.biomarkers.length > 0) {
+        window.scrollTo({ top: 380, behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 120, behavior: 'smooth' });
+      }
     }, 450);
   };
 
@@ -76,10 +95,10 @@ export function App() {
     setCustomPatient(updatedPatient);
   };
 
-  // Save report to localStorage
-  const handleSaveReport = () => {
+  // Save report to storage
+  const handleSaveReport = async () => {
     if (!riskData || !parsedData.patient) return;
-    const saved = saveReportToStorage({
+    const saved = await saveReportToStorage({
       patient: parsedData.patient,
       overallIndex: riskData.overallIndex,
       overallUrgency: riskData.overallUrgency,
@@ -87,15 +106,17 @@ export function App() {
       biomarkers: parsedData.biomarkers
     });
     if (saved) {
-      setSavedReports(getSavedReports());
+      const refreshed = await getSavedReports();
+      setSavedReports(refreshed);
       setIsCurrentSaved(true);
     }
   };
 
   // Delete saved report
-  const handleDeleteReport = (id) => {
-    const updated = deleteReportFromStorage(id);
-    setSavedReports(updated);
+  const handleDeleteReport = async (id) => {
+    await deleteReportFromStorage(id);
+    const refreshed = await getSavedReports();
+    setSavedReports(refreshed);
   };
 
   // Language Change
@@ -125,6 +146,17 @@ export function App() {
     }
   };
 
+  // Handle User Logout
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('health_user');
+  };
+
+  // Handle User Login
+  const handleLoginSuccess = (user) => {
+    setCurrentUser(user);
+  };
+
   // Print Patient Consultation Sheet
   const handlePrint = () => {
     window.print();
@@ -136,6 +168,7 @@ export function App() {
   }, []);
 
   const hasAnalysis = Boolean(riskData && parsedData.biomarkers.length > 0);
+  const hasAttemptedAnalysis = Boolean(currentRawText && currentRawText.trim() && !hasAnalysis);
 
   return (
     <div className={`min-h-screen bg-slate-50 flex flex-col ${currentLang === 'ar' ? 'rtl' : 'ltr'}`}>
@@ -150,13 +183,18 @@ export function App() {
         isAudioPlaying={isAudioPlaying}
         onOpenSavedDrawer={() => setIsSavedDrawerOpen(true)}
         savedReportsCount={savedReports.length}
-        onOpenHostingGuide={() => setIsHostingGuideOpen(true)}
+        currentUser={currentUser}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onLogout={handleLogout}
       />
+
+      {/* Hero Welcome Banner */}
+      <WelcomeBanner />
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Upload Zone (No default sample pre-loaded) */}
+        {/* Upload Zone */}
         <FileUpload
           onAnalyze={handleAnalyze}
           isAnalyzing={isAnalyzing}
@@ -164,62 +202,92 @@ export function App() {
           currentRawText={currentRawText}
         />
 
-        {/* When Report is Uploaded: Show Patient Details, Health Index, Biomarkers & Risk Predictions */}
-        {hasAnalysis ? (
-          <div>
-            
-            {/* 1. Patient Name and Extracted Details Card */}
-            <PatientDetailsCard
-              patient={parsedData.patient}
-              onUpdatePatient={handleUpdatePatient}
-              t={t}
-            />
-
-            {/* 2. Visual Risk & Health Score Overview */}
-            <RiskOverview
-              patient={parsedData.patient}
-              overallIndex={riskData.overallIndex}
-              overallUrgency={riskData.overallUrgency}
-              clinicalSummary={riskData.clinicalSummary}
-              risks={riskData.risks}
-              onSaveReport={handleSaveReport}
-              isSaved={isCurrentSaved}
-              t={t}
-            />
-
-            {/* 3. Biomarkers Table & Visual Range Gauges */}
-            <BiomarkerTable
-              biomarkers={parsedData.biomarkers}
-              t={t}
-            />
-
-            {/* 4. Actionable Doctor Questions */}
-            <DoctorQuestions
-              questions={riskData.doctorQuestions}
-              t={t}
-            />
-
-            {/* 5. Evidence-Based Lifestyle & Nutrition Guidance */}
-            <LifestyleAdvice
-              recommendations={riskData.lifestyleRecommendations}
-              t={t}
-            />
-
-            {/* 6. Interactive AI Health Assistant Chat */}
-            <AIAssistantChat
-              biomarkers={parsedData.biomarkers}
-              patient={parsedData.patient}
-              risks={riskData.risks}
-              t={t}
-            />
-
+        {/* Feedback if file was uploaded but no clinical biomarkers were found */}
+        {hasAttemptedAnalysis && (
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-amber-200 shadow-sm mb-8 text-center max-w-2xl mx-auto animate-fadeIn">
+            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-xl font-bold">
+              ⚠️
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-1.5">
+              No Numerical Lab Biomarkers Recognized in this File
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 mb-4 leading-relaxed">
+              We could not find recognized clinical test names and numbers (e.g. Hemoglobin, Glucose, Creatinine) in the uploaded document. If this was a scanned image or photo, please copy the text and paste it into the <strong>"Or Paste Plain Report Text"</strong> tab above.
+            </p>
+            <div className="p-3 bg-slate-50 rounded-xl text-left font-mono text-[11px] text-slate-600 max-h-28 overflow-y-auto mb-4 border border-slate-200">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Extracted Text Preview:</div>
+              {currentRawText.slice(0, 300) || '(No readable text extracted)'}
+            </div>
           </div>
+        )}
+
+        {/* When Report is Uploaded */}
+        {hasAnalysis ? (
+          <ErrorBoundary>
+            <div>
+              {/* 1. Patient Details Card */}
+              <PatientDetailsCard
+                patient={parsedData.patient}
+                onUpdatePatient={handleUpdatePatient}
+                t={t}
+              />
+
+              {/* 2. Executive Health Summary */}
+              <ExecutiveSummary
+                patient={parsedData.patient}
+                biomarkers={parsedData.biomarkers}
+                diagnosticFindings={parsedData.diagnosticFindings}
+                overallIndex={riskData.overallIndex}
+                clinicalSummary={riskData.clinicalSummary}
+                onPrint={handlePrint}
+                t={t}
+              />
+
+              {/* 3. Visual Risk Overview */}
+              <RiskOverview
+                patient={parsedData.patient}
+                overallIndex={riskData.overallIndex}
+                overallUrgency={riskData.overallUrgency}
+                clinicalSummary={riskData.clinicalSummary}
+                risks={riskData.risks}
+                onSaveReport={handleSaveReport}
+                isSaved={isCurrentSaved}
+                t={t}
+              />
+
+              {/* 4. Biomarkers Table */}
+              <BiomarkerTable
+                biomarkers={parsedData.biomarkers}
+                t={t}
+              />
+
+              {/* 5. Doctor Questions */}
+              <DoctorQuestions
+                questions={riskData.doctorQuestions}
+                t={t}
+              />
+
+              {/* 6. Lifestyle Advice */}
+              <LifestyleAdvice
+                recommendations={riskData.lifestyleRecommendations}
+                t={t}
+              />
+
+              {/* 7. AI Health Assistant Chat */}
+              <AIAssistantChat
+                biomarkers={parsedData.biomarkers}
+                patient={parsedData.patient}
+                risks={riskData.risks}
+                t={t}
+              />
+            </div>
+          </ErrorBoundary>
         ) : null}
 
-        {/* How It Works, Why We Built, The Problem, Our Solution, What Makes Us Different */}
+        {/* How It Works */}
         <AboutAndHowItWorks t={t} />
 
-        {/* Persistent Clinical Safety Disclaimer */}
+        {/* Safety Disclaimer */}
         <MedicalDisclaimer t={t} />
 
       </main>
@@ -234,10 +302,11 @@ export function App() {
         t={t}
       />
 
-      {/* Full Hosting & Cloud Storage Guide Modal */}
-      <HostingGuideModal
-        isOpen={isHostingGuideOpen}
-        onClose={() => setIsHostingGuideOpen(false)}
+      {/* User Authentication & Profile Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
       />
 
     </div>

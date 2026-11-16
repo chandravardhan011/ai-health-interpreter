@@ -1,4 +1,4 @@
-# AI Health Interpreter & Predictive Risk Analyzer
+# AI Health Report Interpreter
 
 An intelligent, multilingual medical lab report interpreter and disease risk prediction platform. Transforms complex clinical laboratory reports (CBC, Lipid Panel, Metabolic Profiles, Liver & Kidney Function) into clear, patient-friendly explanations, multi-disease risk stratification scores, and customized doctor consultation checklists in 10 languages.
 
@@ -48,6 +48,63 @@ An intelligent, multilingual medical lab report interpreter and disease risk pre
    - Severe Microcytic Anemia & Iron Depletion
    - Renal & Hepatic Stress Profile
    - Annual Preventative Wellness Checkup
+
+---
+
+## 🏗️ System Architecture & Working Model
+
+A focused stack connects extraction, OCR, and rule-based clinical analysis. Each layer has a defined role, from the interface to the clinical knowledge base:
+
+```
+[ Patient / Lab Report PDF / Scanned Document ]
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Frontend Layer                                           │
+│    • React.js, Vite, HTML, CSS, JavaScript                  │
+│    • Drag-and-drop report uploader, visual range gauges     │
+│    • Regional audio player & multilingual support           │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 2. PDF & OCR Ingestion Pipeline                             │
+│    • PyMuPDF, Tesseract, pytesseract & Pillow               │
+│    • Client-side Mozilla PDF.js stream extraction           │
+│    • Layout coordinate grouping & tabular row reconstruction│
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Clinical Analysis & Knowledge Engine                     │
+│    • Python & JS rule-based processing                      │
+│    • Structured JSON knowledge base (30+ biomarkers)        │
+│    • Reference interval normalization & status evaluation   │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 4. Output & Presentation Layer                              │
+│    • Executive Health Summary & Key Findings                │
+│    • 4-Pillar Health Stratification (Cardio, Diabetes,      │
+│      Anemia, Overall Wellness Score)                        │
+│    • Tailored Doctor Questions & Lifestyle Guidance         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Layer Responsibilities:
+1. **Frontend (Interactive Client Layer)**:
+   - **Technologies**: React.js, Vite, HTML, CSS, JavaScript.
+   - **Role**: Provides the patient portal, drag-and-drop file upload, visual range gauges, and regional audio player.
+2. **Backend (Server & API Processing)**:
+   - **Technologies**: Python and Flask.
+   - **Role**: Handles server-side parsing endpoints, microservice routing, and asynchronous report batch operations.
+3. **PDF and OCR (Document Ingestion Pipeline)**:
+   - **Technologies**: PyMuPDF, Tesseract, pytesseract, Pillow, and client-side PDF.js.
+   - **Role**: Extracts text streams and spatial coordinates from digital PDFs and runs optical character recognition on scanned pages.
+4. **Analysis (Knowledge & Rule Engine)**:
+   - **Technologies**: Python and rule-based processing with a JSON knowledge base.
+   - **Role**: Evaluates observed numbers against reference intervals, detects status (Normal, Low, High), and formulates tailored doctor questions.
 
 ---
 

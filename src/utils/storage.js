@@ -1,69 +1,131 @@
-const STORAGE_KEY = 'ai_health_interpreter_saved_reports';
+// Firebase Firestore Storage with automatic LocalStorage / IndexedDB fallback
+import { collection, getDocs, addDoc, deleteDoc, doc, query, orderBy, limit } from "firebase/firestore";
+import { db } from "../firebaseConfig";
 
-/**
- * Loads all saved reports from localStorage.
- */
-export function getSavedReports() {
+const LOCAL_STORAGE_KEY = 'ai_health_interpreter_saved_reports';
+
+function getLocalReports() {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
   } catch (e) {
-    console.error('Failed to load saved reports', e);
     return [];
   }
 }
 
-/**
- * Saves a new report to localStorage.
- */
-export function saveReportToStorage(reportData) {
+function saveLocalReport(entry) {
   try {
-    const existing = getSavedReports();
-    const newEntry = {
-      id: 'REP-' + Date.now(),
-      savedAt: new Date().toLocaleString(),
-      patient: reportData.patient,
-      overallIndex: reportData.overallIndex,
-      overallUrgency: reportData.overallUrgency,
-      rawText: reportData.rawText,
-      biomarkersCount: reportData.biomarkers?.length || 0,
-      abnormalCount: reportData.biomarkers?.filter(b => b.status !== 'NORMAL').length || 0
-    };
-
-    const updated = [newEntry, ...existing.slice(0, 19)]; // Keep up to 20 reports
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return newEntry;
+    const existing = getLocalReports();
+    const updated = [entry, ...existing.filter(r => r.id !== entry.id).slice(0, 19)];
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
   } catch (e) {
-    console.error('Failed to save report', e);
-    return null;
+    console.error('LocalStorage write failed:', e);
   }
 }
 
-/**
- * Deletes a report by ID.
- */
-export function deleteReportFromStorage(id) {
+function deleteLocalReport(id) {
   try {
-    const existing = getSavedReports();
+    const existing = getLocalReports();
     const filtered = existing.filter(r => r.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
     return filtered;
   } catch (e) {
-    console.error('Failed to delete report', e);
     return [];
   }
+}
+
+/**
+ * Loads up to 20 most recent reports from Firebase Firestore.
+ * Automatically falls back to LocalStorage if Firestore credentials are unconfigured or offline.
+ */
+export async function getSavedReports() {
+  const isFirebaseConfigured = import.meta.env.VITE_FIREBASE_PROJECT_ID && 
+                               !import.meta.env.VITE_FIREBASE_PROJECT_ID.includes('your_project_id');
+
+  if (isFirebaseConfigured) {
+    try {
+      const q = query(collection(db, "reports"), orderBy("savedAt", "desc"), limit(20));
+      const snapshot = await getDocs(q);
+      const reports = [];
+      snapshot.forEach((docSnap) => {
+        reports.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      return reports;
+    } catch (e) {
+      console.warn("Firestore query failed, using local browser fallback:", e);
+      return getLocalReports();
+    }
+  }
+
+  return getLocalReports();
+}
+
+/**
+ * Saves a new report to Firestore with LocalStorage mirror.
+ */
+export async function saveReportToStorage(reportData) {
+  const newEntry = {
+    id: 'REP-' + Date.now(),
+    savedAt: new Date().toISOString(),
+    patient: reportData.patient,
+    overallIndex: reportData.overallIndex,
+    overallUrgency: reportData.overallUrgency,
+    rawText: reportData.rawText,
+    biomarkersCount: reportData.biomarkers?.length || 0,
+    abnormalCount: reportData.biomarkers?.filter(b => b.status !== "NORMAL").length || 0,
+  };
+
+  // Always mirror in LocalStorage for 100% offline availability
+  saveLocalReport(newEntry);
+
+  const isFirebaseConfigured = import.meta.env.VITE_FIREBASE_PROJECT_ID && 
+                               !import.meta.env.VITE_FIREBASE_PROJECT_ID.includes('your_project_id');
+
+  if (isFirebaseConfigured) {
+    try {
+      const docRef = await addDoc(collection(db, "reports"), newEntry);
+      return { ...newEntry, id: docRef.id };
+    } catch (e) {
+      console.warn("Firestore save failed, saved locally instead:", e);
+      return newEntry;
+    }
+  }
+
+  return newEntry;
+}
+
+/**
+ * Deletes a report document by its Firestore or LocalStorage id.
+ */
+export async function deleteReportFromStorage(id) {
+  deleteLocalReport(id);
+
+  const isFirebaseConfigured = import.meta.env.VITE_FIREBASE_PROJECT_ID && 
+                               !import.meta.env.VITE_FIREBASE_PROJECT_ID.includes('your_project_id');
+
+  if (isFirebaseConfigured) {
+    try {
+      await deleteDoc(doc(db, "reports", id));
+      return true;
+    } catch (e) {
+      console.warn("Firestore delete failed:", e);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
  * Exports all reports as a JSON backup file.
  */
-export function exportReportsBackup() {
-  const reports = getSavedReports();
-  const blob = new Blob([JSON.stringify(reports, null, 2)], { type: 'application/json' });
+export async function exportReportsBackup() {
+  const reports = await getSavedReports();
+  const blob = new Blob([JSON.stringify(reports, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
-  a.download = `health-interpreter-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.download = `health-interpreter-backup-${new Date().toISOString().split("T")[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
